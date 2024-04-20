@@ -1,0 +1,1035 @@
+{% extends "app/base_site.html" %}
+
+{% block title %} {% if  "add" == g.handle %}添加{% else %}编辑{% endif %}布控 {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+    <style>
+    .div_canvas_box{
+        background: #e5e5e5;
+        display: flex;
+        position: relative;
+    }
+    .div_canvas_box>video{
+        width: 100%;
+        height: 100%;
+        /*object-fit: fill;*/
+        /*border-radius: 5px;*/
+        /*border: 1px solid #f0f0f0;*/
+    }
+    .div_canvas_box>video:focus {
+        outline: -webkit-focus-ring-color auto 0px;
+    }
+    .div_canvas_box>canvas{
+        margin: 0 0;
+        border: 1px solid darkred;
+        position: absolute;
+        top: 0;
+        left: 0px;
+        width: 100%;
+        height: 100%;
+        z-index: 6;
+    }
+    .div_canvas_menu{
+        margin-top: 50px;
+        padding: 10px;
+        border: 1px solid #e5e5e5;
+        color: #ffffff;
+        background-color: #ffffff;
+
+
+    }
+    .show_content{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 10px;
+    }
+    .item{
+        flex:1;
+        display: flex;
+         justify-content: center;
+        align-items: center;
+        color: #000;
+    }
+    .img{
+        width: 200px;
+    }
+</style>
+
+{% endblock stylesheets %}
+{% block content %}
+
+<script>
+    let streamCodeDict = {};//视频流字典
+    let streamCode;
+
+    let flowDict = {};//基础算法字典
+    let flowCode;
+
+    let audioCodeDict = {}; //音频字典
+    let audioCode;
+
+    let m_alarmInterfaceCodeDict = {}; //报警接口字典
+    let m_alarmInterfaceCode;
+
+</script>
+
+  <div class="right_col" role="main">
+    <div class="">
+
+      <div class="row">
+        <div class="col-md-12 col-sm-12 col-xs-12">
+          <div class="x_panel">
+            <div class="x_title">
+              <h2>{% if  "add" == g.handle %}添加{% else %}编辑{% endif %}布控</h2>
+             <button style="margin-left:10px;margin-top: 4px;" onclick="f_docs()" class="btn btn-primary btn-xs"><i class="fa fa-book"></i> 文档</button>
+              <div class="clearfix"></div>
+            </div>
+            <div class="x_content">
+
+              <div class="col-md-8 col-sm-8 col-xs-12">
+
+                <div class="div_canvas_box">
+                    <video id="video_player" poster="/static/images/player_poster.jpg" muted controls autoplay>
+                        Your browser is too old which doesn't support h5 video
+                   </video>
+                   <canvas id="canvas" >
+                        Your browser is too old which doesn't support h5 canvas
+                   </canvas>
+                </div>
+
+                <div class="div_canvas_menu">
+                  <button type="button" onclick="f_clickPlayStart()" class="btn btn-success btn-sm"><i class="fa fa-play"></i> 播放 </button>
+                  <button type="button" onclick="f_clickPlayStop()" class="btn btn-default btn-sm"><i class="fa fa-stop"></i> 停止 </button>
+                  <button type="button" onclick="f_clearVideoCanvas()" class="btn btn-default btn-sm"><i class="fa fa-paint-brush"></i> 清空区域</button>
+                  <button type="button" onclick="change(1)" class="btn btn-default">绘制矩形区域</button>
+                  <button type="button" onclick="change(4)" class="btn btn-default">绘制越界区域</button>
+              
+                </div>
+                    <div class="div_canvas_menu show_content" >
+                        <div class="item">绘制矩形区域案例</div>
+                        <div class="item">
+                            <img class="img" src="/static/images/control-rect.png"/>
+                        </div>
+                        <div class="item"><button type="button" onclick="f_docs()" class="btn btn-default btn-sm">文档</button></div>
+                    </div>
+                    <div class="div_canvas_menu show_content">
+                        <div class="item">绘制越线区域案例</div>
+                        <div class="item">
+                            <img class="img" src="/static/images/control-crossline.png" />
+                        </div>
+                        <div class="item"><button type="button"  onclick="f_docs()" class="btn btn-default btn-sm">文档</button></div>
+                     </div>
+
+              </div>
+
+              <div class="col-md-4 col-sm-4 col-xs-12" >
+                  <div class="form-horizontal form-label-left">
+                  {% if  "edit" == g.handle %}
+                        <div class="form-group">
+                          <label class="control-label col-md-3 col-sm-3 col-xs-12">布控ID</label>
+                          <div class="col-md-9 col-sm-9 col-xs-12">
+                              <span style="height: 34px;line-height: 34px;padding: 6px 0;">{{ g.control.id }}</span>
+                          </div>
+                        </div>
+                {% endif %}
+                        <div class="form-group">
+                          <label class="control-label col-md-3 col-sm-3 col-xs-12">布控编号</label>
+                          <div class="col-md-9 col-sm-9 col-xs-12">
+                              <span style="height: 34px;line-height: 34px;padding: 6px 0;">{{ g.control.code }}</span>
+                          </div>
+                        </div>
+
+                    <div class="form-group">
+                          <label class="control-label col-md-3 col-sm-3 col-xs-12">选择视频流</label>
+                        <div class="col-md-9 col-sm-9 col-xs-12">
+                            {% if  "add" == g.handle %}
+                              <select  id="select_stream" class="select2_single form-control" required="required" >
+                                  {% if g.streams|length == 0 %}
+                                      <option value="-1">暂无视频流</option>
+                                  {% else %}
+                                      <option value="0">请选择视频流</option>
+
+                                    {% for stream in g.streams %}
+                                        <script>
+                                            streamCode = '{{ stream.code }}';
+                                            streamCodeDict[streamCode] = {
+                                                'code':streamCode,
+                                                "app":'{{ stream.app }}',
+                                                "name":'{{ stream.name }}',
+                                                "video":'{{ stream.video }}',
+                                                "video_codec_name":'{{ stream.video_codec_name }}',
+                                                "video_width":parseInt('{{ stream.video_width }}'),
+                                                "video_height":parseInt('{{ stream.video_height }}'),
+                                                "audio":'{{ stream.audio }}',
+                                                "videoUrl":'{{ stream.videoUrl }}',
+                                                "wsHost":'{{ stream.wsHost }}',
+                                                "wsMp4Url":'{{ stream.wsMp4Url }}',
+                                                "source_nickname":'{{ stream.source_nickname }}'
+                                            }
+                                        </script>
+                                        <option value="{{ stream.code }}">{{ stream.source_nickname }}</option>
+                                    {% endfor %}
+                                  {% endif %}
+                              </select>
+                         {% else %}
+                                <!-- 编辑 -->
+                              <select id="select_stream"  disabled="disabled"  class="select2_single form-control" >
+                              <!--streamCode的组成格式是 app_name -->
+                                <option selected value="{{ g.control.stream_app }}_{{ g.control.stream_name }}">{{ control_stream_nickname}}</option>
+                              </select>
+                         {% endif %}
+                       </div>
+                   </div>
+
+
+                    <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12">视频信息</label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                             <input id="input_video"  type="text" disabled="disabled" value="{{ g.control.stream_video }}" class="form-control">
+                      </div>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12">音频信息</label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                           <input id="input_audio"  type="text" disabled="disabled" value="{{ g.control.stream_audio }}" class="form-control">
+                      </div>
+                    </div>
+
+
+
+                    <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12">播放地址</label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                           <input id="input_video_url"  type="url" disabled="disabled" class="form-control">
+                      </div>
+                    </div>
+
+                          <div class="ln_solid"></div>
+
+
+                    <div class="form-group">
+                          <label class="control-label col-md-3 col-sm-3 col-xs-12">选择算法
+                          </label>
+
+                          <div class="col-md-9 col-sm-9 col-xs-12">
+
+                            <select id="select_flow"  class="select2_single form-control" required="required" >
+                                <option value="0">请选择基础算法</option>
+                                {% for flow in g.flows %}
+                                   <script>
+                                        flowCode = '{{ flow.code }}';
+                                        flowDict[flowCode] = {
+                                            "code":flowCode,
+                                            "name":'{{ flow.name }}'
+                                        }
+                                    </script>
+
+                                    <option {% if flow.code == g.control.flow_code %} selected {% endif %} value="{{ flow.code }}">{{ flow.name }}</option>
+                                {% endfor %}
+                            </select>
+
+                          </div>
+                    </div>
+
+
+
+                        <div class="form-group">
+                          <label class="control-label col-md-3 col-sm-3 col-xs-12">选择音频 <i class="bxc_introduce fa fa-info-circle" title="触发报警时播放的音频"></i>
+                          </label>
+
+                          <div class="col-md-9 col-sm-9 col-xs-12">
+
+                            <select id="select_audio"  class="select2_single form-control" required="required" >
+                                <option value="0">请选择报警音频</option>
+                                {% for audio in g.audios %}
+                                   <script>
+                                        audioCode = '{{ audio.code }}';
+
+                                        audioCodeDict[audioCode] = {
+                                            "code":audioCode,
+                                            "name":'{{ audio.name }}'
+                                        }
+
+                                    </script>
+
+                                    <option {% if audio.code == g.control.audio_code %} selected {% endif %} value="{{ audio.code }}">{{ audio.name }}</option>
+                                {% endfor %}
+                            </select>
+
+                          </div>
+                    </div>
+
+                      <div class="form-group">
+                          <label class="control-label col-md-3 col-sm-3 col-xs-12">报警接口
+                          </label>
+
+                          <div class="col-md-9 col-sm-9 col-xs-12">
+
+                            <select id="select_alarm_interface"  class="select2_single form-control" required="required" >
+                                <option value="0">请选择报警接口</option>
+                                {% for alarmInterface in g.alarmInterfaces %}
+                                   <script>
+                                        m_alarmInterfaceCode = '{{ alarmInterface.code }}';
+
+                                        m_alarmInterfaceCodeDict[m_alarmInterfaceCode] = {
+                                            "code":m_alarmInterfaceCode,
+                                            "name":'{{ alarmInterface.name }}'
+                                        }
+
+                                    </script>
+
+                                    <option {% if alarmInterface.code == g.control.alarm_interface_code %} selected {% endif %} value="{{ alarmInterface.code }}">{{ alarmInterface.name }}</option>
+                                {% endfor %}
+                            </select>
+
+                          </div>
+                    </div>
+
+                       <div class="form-group">
+                           <label class="control-label col-md-3 col-sm-3 col-xs-12">是否推流 <i class="bxc_introduce fa fa-info-circle" title="实时分析视频时是否推流"></i></label>
+                          <div class="col-md-9 col-sm-9 col-xs-12">
+
+                            <div class="radio">
+                              <label>
+                                <input type="radio" {% if g.control.push_stream == 0 %} checked="checked" {% endif %} value="0" name="push_stream"> 算法处理的视频不推流
+                              </label>
+                            </div>
+
+                            <div class="radio">
+                              <label>
+                                <input type="radio" {% if g.control.push_stream == 1 %} checked="checked" {% endif %} value="1" name="push_stream"> 算法处理的视频推流
+                              </label>
+                            </div>
+
+                          </div>
+                        </div>
+
+
+
+                  <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12">报警间隔 <i class="bxc_introduce fa fa-info-circle" title="1路视频最小报警间隔时长（单位秒）"></i></label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                           <input id="min_interval"  type="number" value="{{ g.control.min_interval }}" class="form-control" >
+                      </div>
+                    </div>
+
+                  <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12">重叠比例 <i class="bxc_introduce fa fa-info-circle" title="目标被检测的部分占目标本身的比例"></i></label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                           <input id="overlap_thresh"  type="number" value="{{ g.control.overlap_thresh }}" class="form-control" >
+                      </div>
+                    </div>
+
+                  <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12">图片数量 <i class="bxc_introduce fa fa-info-circle" title="触发报警行为时间范围内合成图片数量"></i></label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                           <input name="alarm_image_count"  type="number" value="{{ g.control.alarm_image_count }}" class="form-control" >
+                      </div>
+                    </div>
+
+                  <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12">时间范围 <i class="bxc_introduce fa fa-info-circle" title="触发报警行为的时间范围（单位秒）"></i></label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                           <input name="alarm_monitor_duration"  type="number" value="{{ g.control.alarm_monitor_duration }}" class="form-control" >
+                      </div>
+                    </div>
+
+
+                <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12">画框选项 <i class="bxc_introduce fa fa-info-circle" title="合成报警视频画框类型"></i></label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+
+                          <div class="radio">
+                              <label>
+                                <input type="radio" {% if g.control.alarm_draw_type == 0 %} checked="checked" {% endif %} value="0" name="alarm_draw_type"> 合成报警视频只保存画框
+                              </label>
+                            </div>
+
+                            <div class="radio">
+                              <label>
+                                <input type="radio" {% if g.control.alarm_draw_type == 1 %} checked="checked" {% endif %} value="1" name="alarm_draw_type"> 合成报警视频同时保存画框和不画框
+                              </label>
+                            </div>
+
+
+                      </div>
+                    </div>
+
+                  <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12" for="textarea">OSD
+                      </label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                        <textarea rows="4" name="osd_params" class="form-control col-md-7 col-xs-12">{{ g.control.osd_params }}</textarea>
+                      </div>
+                </div>
+
+                  <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12" for="textarea">扩展参数
+                      </label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                        <textarea rows="3" name="extend_params" class="form-control col-md-7 col-xs-12">{{ g.control.extend_params }}</textarea>
+
+                      </div>
+                </div>
+
+               <div class="form-group">
+                      <label class="control-label col-md-3 col-sm-3 col-xs-12" for="textarea">备注
+                      </label>
+                      <div class="col-md-9 col-sm-9 col-xs-12">
+                        <textarea required="required" name="remark" class="form-control col-md-7 col-xs-12">{{ g.control.remark }}</textarea>
+
+                      </div>
+                </div>
+
+                      <div class="ln_solid"></div>
+
+                        <div class="form-group">
+                          <div class="col-md-9 col-sm-9 col-xs-12 col-md-offset-3">
+                            <button type="button" onclick="window.history.go(-1)" class="btn btn-primary">取消</button>
+                            <button type="button" onclick="f_postHandle()" class="btn btn-success">提交</button>
+                          </div>
+                        </div>
+
+                    </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+
+<script src="/static/lib/wsPlayer/mp4box.all.min.js"></script>
+<script src="/static/lib/wsPlayer/wsPlayer.js"></script>
+    <!-- \static\vendors\canvas_select -->
+    <script src="/static/vendors/canvas_select/canvas-select.min.js"></script>
+<script>
+
+    let controlCode= '{{ g.control.code }}';// 布控编号
+    let old_control_polygon = '{{ g.control.polygon }}';// 布控多边形坐标点
+    let old_control_polygon_type = '{{ g.control.polygon_type }}';// string类型
+
+    let handle = '{{ g.handle }}';// 操作类型 add 或 edit
+
+    let eleCanvas=document.getElementById("canvas");
+    //得到画布的上下文,上下文有两个 2d和3d
+    //所有的图形绘制都是通过ctx属性或者方法进行设置的，和canvas标签没有关系了
+    let ctx = eleCanvas.getContext("2d");
+    let recognitionRegionLineArray = [];//存储多边形的每一条边
+    let recognitionRegionLineMaxCount = 4;//多边形的边数
+    let tempPolygonLine = null;//多边形的边，临时变量
+
+    let mWsVideoPlayer = null;
+    let eleVideoPlayerJqueryObj = $("#video_player");
+    let eleVideoPlayerJsObj= document.getElementById("video_player");
+    let videoContent=document.querySelector('.div_canvas_box')
+    let mVideoUrl = null;
+
+    let eleSelectStream = $("#select_stream");// select  选择视频流
+    let eleInputVideoUrl= $("#input_video_url");// input
+    let eleInputVideo = $("#input_video");// input
+    let eleInputAudio = $("#input_audio");// input
+    let eleSelectFlow = $("#select_flow");// select 算法
+
+    let eleSelectAudio = $("#select_audio");// select 音频
+    let eleSelectAlarmInterface = $("#select_alarm_interface");// select 报警接口
+    let eleInputMinInterval = $("#min_interval");
+    let eleInputOverlapThresh = $("#overlap_thresh");
+
+    //是否推流
+    let eleRadioPushStream = $('input[type=radio][name=push_stream]');//radio
+    let pushStream = $('input[type=radio][name=push_stream]:checked').val();
+
+    // 报警图片数量
+    let eleInputAlarmImageCount= $("input[type=number][name='alarm_image_count']");
+    let eleInputAlarmMonitorDuration= $("input[type=number][name='alarm_monitor_duration']");
+
+    // 报警视频是否画框
+    let eleRadioAlarmDrawType = $('input[type=radio][name=alarm_draw_type]');//radio
+    let alarmDrawType = $('input[type=radio][name=alarm_draw_type]:checked').val();
+
+    let eleTextarea_osd_params = $("textarea[name='osd_params']");
+    let eleTextarea_extend_params = $("textarea[name='extend_params']");
+    let eleTextarea_remark = $("textarea[name='remark']");
+            canvas.width= eleVideoPlayerJsObj.clientWidth
+            canvas.height = eleVideoPlayerJsObj.clientHeight
+       let img = canvas.toDataURL();
+        let instance = new CanvasSelect("#canvas", img);
+        let option = [];
+        instance.labelMaxLen = 10;
+     //   instance.setData(option);
+
+      instance.on("load", (src) => {
+        });
+        // 添加
+        instance.on("add", (info) => {
+ 
+            // 有一个 并且是1 就不让画
+               let flag = false
+            if (info.type == 4) {
+                change(6)
+            }
+            for (let i = 0; i < option.length; i++) {
+                if (option[i].type == info.type) {
+                    flag = true
+                }
+            }
+            option.push(info);
+               if (option.length == 2) {
+                let fItem = option[0]
+                if (fItem.type == 1) {
+                    option.pop()
+                    instance.setData(option);
+                    change(0)
+                } else if (info.type == 1) {
+                    option.shift()
+                    instance.setData(option);
+                    change(0)
+                } else if (info.type == 6) {
+                    let ind = option.length
+                    let line = option[ind - 2] // 拿到直线
+                    let res = doLinesIntersect(line.coor[0], line.coor[1], info.coor[0], info.coor[1]);
+                    if (!res) {
+                        alert("方向线不合规，重新标注")
+                        option.pop()
+                        instance.setData(option);
+                        flag = false
+                        change(0)
+                    }
+                }
+            } else if (option.length == 3) {
+                if (info.type == 6) {
+                    let ind = option.length
+                    let line = option[ind - 2] // 拿到直线
+                    let res = doLinesIntersect(line.coor[0], line.coor[1], info.coor[0], info.coor[1]);
+                    if (!res) {
+                        alert("方向线不合规，重新标注")
+                        option.pop()
+                        instance.setData(option);
+                        flag = false
+                        change(0)
+                    }
+                } else if (info.type == 4) {
+                    flag = true
+                } else {
+                    option.pop()
+                    instance.setData(option);
+                    change(0)
+                }
+            }
+            if (flag) {
+                myAlert("已存在该类型，清除后重新标注", "error");
+                option.pop()
+                instance.setData(option);
+                if (info.type == 4) {
+                    change(6)
+                } else {
+                    change(0)
+                }
+                flag = false
+            }
+        });
+        // 删除
+        instance.on("delete", (info) => {
+            window.info = info;
+        });
+        // 选中
+        instance.on("select", (shape) => {
+            window.shape = shape;
+        });
+        instance.on("updated", (result) => {
+          //   myAlert("请选择视频流", "error");
+            const list = [...result];
+
+            list.sort((a, b) => a.index - b.index);
+        });
+
+        function change(num) {
+            instance.createType = num;
+        }
+    //清空绘制区域数据
+    function f_clearVideoCanvas() {
+        ctx.clearRect(0,0, videoContent.clientWidth, videoContent.clientHeight);
+        recognitionRegionLineArray = [];
+        option = [];
+        instance.setData(option);
+        change(0)
+    }
+    //窗口对齐->清空绘制区域数据
+    function f_adjustVideoCanvas() {
+        //执行窗口对齐以后，此前的绘制区域数据，可能不在对应，因此需要删除
+        let w = eleVideoPlayerJsObj.offsetWidth;
+        let h = eleVideoPlayerJsObj.offsetHeight;
+        w = w - 1.8;
+       h = h - 2.2;
+       eleCanvas.style.width = String(w)+"px";
+       eleCanvas.style.height = String(h)+"px";
+       instance.setData(option);
+       change(0)
+        
+    }
+    function f_reDrawVideoCanvas() {
+        return 
+        ctx.clearRect(0,0, videoContent.clientWidth, videoContent.clientHeight);
+    }
+
+  function doLinesIntersect(p1, q1, p2, q2) {
+        // 计算直线1和直线2的a, b, c
+        const a1 = q1[1] - p1[1];
+        const b1 = p1[0] - q1[0];
+        const c1 = a1 * p1[0] + b1 * p1[1];
+
+        const a2 = q2[1] - p2[1];
+        const b2 = p2[0] - q2[0];
+        const c2 = a2 * p2[0] + b2 * p2[1];
+
+        // 计算行列式
+        const det = a1 * b2 - a2 * b1;
+
+        // 没有交点
+        if (det === 0) {
+            return false;
+        }
+
+        // 计算交点坐标
+        const x = (b2 * c1 - b1 * c2) / det;
+        const y = (a1 * c2 - a2 * c1) / det;
+
+        // 检查交点是否在两条线的段上
+        return (
+            (p1[0] <= x && x <= q1[0] && p2[0] <= x && x <= q2[0]) ||
+            (p1[0] >= x && x >= q1[0] && p2[0] >= x && x >= q2[0]) ||
+            (p1[1] <= y && y <= q1[1] && p2[1] <= y && y <= q2[1]) ||
+            (p1[1] >= y && y >= q1[1] && p2[1] >= y && y >= q2[1])
+        );
+    }
+    eleSelectStream.change(function () {
+        streamCode = $(this).val();
+        let stream = streamCodeDict[streamCode];
+        if (stream) {
+            let wsHost = stream["wsHost"];
+            let video_codec_name = stream["video_codec_name"];
+            let video_width = stream["video_width"];
+            let video_height = stream["video_height"];
+            let app = stream["app"];
+            let name = stream["name"];
+            let target_video_width = 1280;
+            let target_video_height = 720;
+            let video_url = f_createTranscodeUrl(wsHost,video_codec_name,video_width,video_height,app,name,target_video_width,target_video_height);
+            mVideoUrl = video_url;
+
+            eleInputVideoUrl.val(video_url)
+            eleInputVideo.val(stream["video"])
+            eleInputAudio.val(stream["audio"])
+            f_playStart(video_url);
+        }else{
+            eleInputVideoUrl.val("")
+            eleInputVideo.val("")
+            eleInputAudio.val("")
+            f_playStop();
+        }
+
+        for (let i = 0; i < 10; i++) {
+            setTimeout(function () {
+                f_adjustVideoCanvas();
+            }, i*200);
+        }
+    });
+
+    eleRadioPushStream.change(function () {
+        pushStream = $(this).val();
+    });
+    eleRadioAlarmDrawType.change(function () {
+       alarmDrawType = $(this).val();
+    });
+
+    function f_playStart(video_url){
+        
+        console.log("f_playStart()",video_url);
+        if(typeof video_url === "undefined" || !video_url.startsWith("ws://") || !video_url.endsWith(".mp4")){
+            myAlert("视频流地址格式不正确！","error");
+            return false;
+        }
+        if(mWsVideoPlayer){
+            try {
+                mWsVideoPlayer.close();
+            }catch (e) {
+                console.log("f_playStart() err:",e);
+            }
+        }
+	    mWsVideoPlayer = new wsPlayer("video_player", video_url);
+        mWsVideoPlayer.open();
+        initCanvasData()
+    }
+    function f_playStop(){
+        if(mWsVideoPlayer){
+            mWsVideoPlayer.close();
+            mWsVideoPlayer = null;
+
+            eleVideoPlayerJqueryObj.removeAttr("src");
+            eleVideoPlayerJqueryObj.load();
+        }else{
+            myAlert("播放器未启动！","error");
+        }
+        f_clearVideoCanvas()
+
+    }
+    function f_clickPlayStart() {
+        if(mVideoUrl){
+            f_playStart(mVideoUrl);
+            for (let i = 0; i < 10; i++) {
+                setTimeout(function () {
+                    f_adjustVideoCanvas();
+                }, i*200);
+            }
+        }
+
+    }
+    function f_clickPlayStop() {
+        f_playStop();
+        f_adjustVideoCanvas();
+    }
+    function f_postHandle() {
+        streamCode = eleSelectStream.val().trim();//typeof string
+        if(streamCode==="-1"){
+            myAlert("暂无视频流","error");
+            return;
+        }else if(streamCode==="0"){
+            myAlert("请选择视频流","error");
+            return;
+        }
+        flowCode = eleSelectFlow.val().trim();//typeof string
+        if(flowCode==="0"){
+            myAlert("请选择算法","error");
+            return;
+        }
+
+        audioCode = eleSelectAudio.val().trim();//typeof string
+        if(audioCode==="0"){
+            myAlert("请选择音频","error");
+            return;
+        }
+        m_alarmInterfaceCode = eleSelectAlarmInterface.val().trim();//typeof string
+        if(m_alarmInterfaceCode==="0"){
+            myAlert("请选择报警接口","error");
+            return;
+        }
+
+        let minInterval = parseInt(eleInputMinInterval.val());
+        if(isNaN(minInterval)){
+            myAlert("报警间隔时间不能为空","error");
+            return;
+        }
+        if(minInterval<0){
+            myAlert("报警间隔时间不能小于0秒","error");
+            return;
+        }
+
+        let overlapThresh = parseFloat(eleInputOverlapThresh.val());
+        if(isNaN(overlapThresh)){
+            myAlert("重叠阈值不能为空","error");
+            return;
+        }
+
+        if(overlapThresh<=0){
+            myAlert("重叠阈值不能小于等于0","error");
+            return;
+        }
+        if(overlapThresh>1){
+            myAlert("重叠阈值不能大于1","error");
+            return;
+        }
+        //报警合成图片数量start
+        let alarmImageCount = parseInt(eleInputAlarmImageCount.val());
+        if(isNaN(alarmImageCount)){
+            myAlert("报警图片数量不能为空","error");
+            return;
+        }
+        if(alarmImageCount<=0){
+            myAlert("报警图片数量不能小于等于0","error");
+            return;
+        }
+        if(alarmImageCount>50){
+            myAlert("报警图片数量不能大于50","error");
+            return;
+        }
+         //报警合成图片数量end
+
+        //触发报警行为的时间范围（单位秒）start
+        let alarmMonitorDuration = parseInt(eleInputAlarmMonitorDuration.val());
+        if(isNaN(alarmMonitorDuration)){
+            myAlert("时间范围不能为空","error");
+            return;
+        }
+        if(alarmMonitorDuration<10){
+            myAlert("时间范围不能小于10秒","error");
+            return;
+        }
+        if(alarmMonitorDuration>600){
+            myAlert("时间范围不能大于600秒","error");
+            return;
+        }
+         //触发报警行为的时间范围（单位秒）end
+
+        let osd_params = eleTextarea_osd_params.val().trim();
+        let extend_params = eleTextarea_extend_params.val().trim();
+        let remark = eleTextarea_remark.val().trim();
+
+        let __polygon_point_array = [];// x1,y1,x2,y2,x3,y3,x4,y4 ->顺时针
+        if(recognitionRegionLineArray.length === 0){
+            __polygon_point_array.push(0);
+            __polygon_point_array.push(0);
+
+            __polygon_point_array.push(1);
+            __polygon_point_array.push(0);
+
+            __polygon_point_array.push(1);
+            __polygon_point_array.push(1);
+
+            __polygon_point_array.push(0);
+            __polygon_point_array.push(1);
+
+        }else{
+            if(recognitionRegionLineArray.length!==recognitionRegionLineMaxCount){
+                myAlert("绘制算法识别区域需要形成闭环！","error");
+                return;
+            }
+            let canvas_width = eleCanvas.width;
+            let canvas_height = eleCanvas.height
+            for (let i = 0; i < recognitionRegionLineArray.length; i++) {
+                let line = recognitionRegionLineArray[i];
+                __polygon_point_array.push((line.x/canvas_width).toFixed(4));
+                __polygon_point_array.push((line.y/canvas_height).toFixed(4));
+            }
+        }
+
+
+        // 在这里发送数据
+        let rePolygon = []
+        for(let i=0;i<option.length;i++){
+            let item=option[i];
+            if(item.type){
+
+            }
+        }
+       // let polygon = __polygon_point_array.join(",");
+       // 收集点
+        let canvas_width = videoContent.clientWidth;
+        let canvas_height = videoContent.clientHeight
+       let polygonArr=[]
+        let polygon_type=0
+        if(option.length===1){
+            let rItem=option[0];
+            let topL=rItem.coor[0];
+            let botR = rItem.coor[1];
+
+            let topR = [botR[0], topL[1]];
+            let botL = [topL[0], botR[1]];
+            // 四个点
+            polygonArr.push((topL[0]/canvas_width).toFixed(4));
+            polygonArr.push((topL[1]/canvas_height).toFixed(4));
+            polygonArr.push((topR[0]/canvas_width).toFixed(4));
+            polygonArr.push((topR[1]/canvas_height).toFixed(4));
+            polygonArr.push((botR[0]/canvas_width).toFixed(4));
+            polygonArr.push((botR[1]/canvas_height).toFixed(4));
+            polygonArr.push((botL[0]/canvas_width).toFixed(4));
+            polygonArr.push((botL[1]/canvas_height).toFixed(4));
+            polygon_type=1
+        }else if(option.length===2){
+            let FItem = option[0];
+            let LItem = option[1];
+            let topL= FItem.coor[0];
+            let topR= FItem.coor[1];
+            let botL= LItem.coor[0];
+            let botR= LItem.coor[1];
+              // 四个点
+            polygonArr.push((topL[0] / canvas_width).toFixed(4));
+            polygonArr.push((topL[1] / canvas_height).toFixed(4));
+            polygonArr.push((topR[0] / canvas_width).toFixed(4));
+            polygonArr.push((topR[1] / canvas_height).toFixed(4));
+            polygonArr.push((botR[0] / canvas_width).toFixed(4));
+            polygonArr.push((botR[1] / canvas_height).toFixed(4));
+            polygonArr.push((botL[0] / canvas_width).toFixed(4));
+            polygonArr.push((botL[1] / canvas_height).toFixed(4));
+
+            polygon_type = 2
+        }else{
+               // 四个点
+            polygonArr.push(0);
+            polygonArr.push(0);
+            polygonArr.push(0);
+            polygonArr.push(1);
+            polygonArr.push(1);
+            polygonArr.push(1);
+            polygonArr.push(1);
+            polygonArr.push(0);
+            polygon_type = 1
+        }
+        let polygon = polygonArr.join(",");
+        // 判断类型
+        let data = {
+            "controlCode":controlCode,
+            "flowCode":flowCode,
+            "audioCode":audioCode,
+            "alarmInterfaceCode":m_alarmInterfaceCode,
+            "pushStream":pushStream,
+            "polygon":polygon,
+            "minInterval":minInterval,
+            "overlapThresh":overlapThresh,
+            "alarmDrawType":alarmDrawType,
+            "alarmImageCount":alarmImageCount,
+            "alarmMonitorDuration":alarmMonitorDuration,
+            "osd_params":osd_params,
+            "extend_params":extend_params,
+            "remark":remark,
+            "polygon_type": polygon_type
+        }
+
+        let handleUrl;
+        if("add" === handle){
+            handleUrl = "/control/postAdd";
+            let stream = streamCodeDict[streamCode];
+            if (stream){
+                data["streamApp"] = stream["app"]
+                data["streamName"] = stream["name"]
+                data["streamVideo"] = stream["video"]
+                data["streamAudio"] = stream["audio"]
+            }else{
+                return;
+            }
+        }else if("edit" === handle){
+            handleUrl = "/control/postEdit";
+        }else{
+            return;
+        }
+        $.ajax({
+           url: handleUrl,
+           type: "post",
+           async: true,
+           data: data,
+           dataType: "json",
+           timeout: "3000",
+           error: function () {
+                myAlert("网络异常，请确定网络正常！","error",3000);
+           },
+           success: function (res) {
+               if(1000 === res.code){
+                    myAlert(res.msg,"success",3000);
+                 //    f_clearVideoCanvas()
+               }else{
+                    myAlert(res.msg,"error",3000);
+               }
+           }
+        });
+
+    }
+
+    window.onresize = function () {
+        f_adjustVideoCanvas();
+    }
+
+    function f_docs() {
+        window.open("https://gitee.com/Vanishi/BXC_VideoAnalyzer_v4/wikis/布控管理/添加布控");
+    }
+    function initCanvasData(){
+           if (old_control_polygon !== "") {//编辑布控->绘制周界区域存在
+            f_adjustVideoCanvas();
+            let canvas_width = videoContent.clientWidth;
+            let canvas_height = videoContent.clientHeight
+            let polygonData = old_control_polygon.split(',')
+
+            let ind = polygonData.length
+            option = []
+
+            if (old_control_polygon_type == 1) {
+                let topLx = parseInt(polygonData[0] * canvas_width)
+                let topLy = parseInt(polygonData[1] * canvas_height)
+                let bomRx = parseInt(polygonData[ind - 4] * canvas_width)
+                let bomRy = parseInt(polygonData[ind - 3] * canvas_height)
+                let topL = [topLx, topLy];
+                let bomR = [bomRx, bomRy];
+                let obj = {
+                    type: 1,
+                    coor: [topL, bomR]
+                }
+                option.push(obj)
+                instance.setData(option)
+                console.log(option, 'option');
+                change(0)
+            } else if (old_control_polygon_type == 2) {
+                let objL = {
+                    "coor": [],
+                    "type": 4
+                }
+                let objLa = {
+                    "coor": [],
+                    "type": 6
+                }
+                for (let i = 0; i < polygonData.length; i++) {
+                    if (i % 2 === 0) {
+                        if (i > 3) {
+                            let x = polygonData[i] * canvas_width
+                            let y = polygonData[i + 1] * canvas_height
+                            objLa.coor.unshift([x, y])
+                        } else {
+                            let x = polygonData[i] * canvas_width
+                            let y = polygonData[i + 1] * canvas_height
+                            objL.coor.push([x, y])
+                        }
+                    }
+                }
+
+                option.push(objL)
+                option.push(objLa)
+                instance.setData(option)
+                change(0)
+            }
+            f_reDrawVideoCanvas();
+        }
+    }
+    $(function() {
+        if(handle==="edit"){
+            //编辑 start
+            let is_online = parseInt("{{ g.control_stream.is_online }}");
+            let video_codec_name = "{{ g.control_stream.video_codec_name }}";
+            let video_width = parseInt("{{ g.control_stream.video_width }}");
+            let video_height = parseInt("{{ g.control_stream.video_height }}");
+            let app = "{{ g.control_stream.app }}";
+            let name = "{{ g.control_stream.name }}";
+            let wsHost = "{{ g.control_stream.wsHost }}";
+            let wsMp4Url = "{{ g.control_stream.wsMp4Url }}";
+            //let httpMp4Url = "{{ g.control_stream.httpMp4Url }}";
+            //let rtspUrl = "{{ g.control_stream.rtspUrl }}";
+
+            let video_url;
+            if(is_online){
+                let target_video_width = 1280;
+                let target_video_height = 720;
+                video_url = f_createTranscodeUrl(wsHost,video_codec_name,video_width,video_height,app,name,target_video_width,target_video_height);
+            }else{
+                video_url  = wsMp4Url;//不在线，就用默认地址
+            }
+            mVideoUrl = video_url;
+            eleInputVideoUrl.val(video_url);
+
+            f_playStart(video_url);
+            f_adjustVideoCanvas();
+             //编辑 end
+        }
+
+        setTimeout( () =>{
+         initCanvasData()
+        }, 1200);
+
+    });
+
+</script>
+
+{% endblock javascripts %}
